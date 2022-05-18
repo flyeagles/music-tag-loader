@@ -4,7 +4,65 @@ import os
 import re
 import logging
 
+from mutagen.flac import FLAC
+from mutagen.apev2 import APEv2File
+from mutagen.mp3 import MP3
+from mutagen.wave import WAVE
+import mutagen
+from mutagen.wavpack import WavPack
+
 logger = logging.getLogger('tag_loader')
+
+def get_wav_meta(filename):
+    audio = WAVE(filename)
+    print(audio.pprint())
+    print(audio.tags)
+    return get_mp3_metadata(audio)
+
+def get_flac_meta(filename):
+    audio = FLAC(filename)
+    return get_metadata(audio)
+
+def get_mp3_meta(filename):
+    audio = MP3(filename)
+    return get_mp3_metadata(audio)
+
+def get_mp3_metadata(audio):    
+    album = audio["TALB"][0]
+    if 'TPE1' in audio.tags:
+        performer = audio['TPE1'][0]
+    else:
+        performer = audio['TPE2'][0]
+    
+    if "TDRC" in audio.tags:
+        year = str(audio["TDRC"][0])
+    else:
+        year = ""
+
+    return (album, performer, year)
+
+
+def get_ape_meta(filename):
+    audio = APEv2File(filename)
+    return get_metadata(audio)
+
+def get_metadata(audio):    
+    album = audio["ALBUM"][0]
+    if 'ALBUMARTIST' in audio.tags:
+        performer = audio['ALBUMARTIST'][0]
+    elif 'ARTIST' in audio.tags:
+        performer = audio['ARTIST'][0]
+    else:
+        performer = audio['ALBUM ARTIST'][0]
+
+    if "DATE" in audio.tags:
+        year = audio["DATE"][0]
+    elif 'YEAR' in audio.tags:
+        year = audio["YEAR"][0]
+    else:
+        year = ""
+
+    return (album, performer, year)
 
 def parse_cue(filename):
     album = ""
@@ -53,17 +111,51 @@ def get_albums(baseroot):
         # print(dirs) subfolders within root
         # print(files) files within root
         os.chdir(root)
+        no_cue = True
         for filename in files:
+            fullpath = os.path.join(root, filename)
             if filename.endswith("cue") or filename.endswith("CUE"):
-                logger.debug(filename)
+                logger.debug(fullpath)
                 albums.append(parse_cue(filename))
+                no_cue = False
                 break
+
+        if no_cue:
+            for filename in files:
+                fullpath = os.path.join(root, filename)
+                if filename.endswith('flac') or filename.endswith('FLAC'):
+                    logger.debug('flac: ' + fullpath)
+                    albums.append(get_flac_meta(filename))
+                    no_cue = False
+                    break
+
+                if filename.endswith('ape') or filename.endswith('APE'):
+                    logger.debug('ape: '+fullpath)
+                    albums.append(get_ape_meta(filename))
+                    no_cue = False
+                    break
+
+                if filename.endswith('mp3') or filename.endswith('MP3'):
+                    logger.debug('mp3: '+fullpath)
+                    albums.append(get_mp3_meta(filename))
+                    no_cue = False
+                    break
+
+                if filename.endswith('wav') or filename.endswith('WAV'):
+                    logger.debug('wav: '+fullpath)
+                    albums.append(get_wav_meta(filename))
+                    no_cue = False
+                    break
+
+        if no_cue and len(files) > 1:
+            logger.error(f"No cue in {root}.")
+            logger.error(files)
     return albums
 
 import sqlite3
 
 
-def write_albums(sqlitefile, albums):
+def write_albums(sqlitefile, albums, debug):
     print(sqlitefile)
     with sqlite3.connect(sqlitefile) as CONN:
         cursor = CONN.cursor()
@@ -72,7 +164,20 @@ def write_albums(sqlitefile, albums):
 
         # insert multiple records using the more secure "?" method
         # albums = [('title', 'performer', 'year'),('title', 'performer', 'year')]
-        cursor.executemany("INSERT INTO albums VALUES (?,?,?) ON CONFLICT DO NOTHING", albums)
+        if debug:
+            for item in albums:
+                try:
+                    cursor.executemany("INSERT INTO albums VALUES (?,?,?) ON CONFLICT DO NOTHING", [item])
+                except sqlite3.InterfaceError as e:
+                    logger.error(f"Type par0: {type(item[0])}")
+                    logger.error(f"Type par1: {type(item[1])}")
+                    logger.error(f"Type par2: {type(item[2])}")
+                    logger.error(item)
+                    logger.error(e)
+                    exit(1)
+        else:
+            cursor.executemany("INSERT INTO albums VALUES (?,?,?) ON CONFLICT DO NOTHING", albums)
+
         CONN.commit()            
         cursor.close()
 
@@ -96,4 +201,4 @@ if __name__ == "__main__":
     
     print(f'Found {len(albums)} albums.')
 
-    write_albums(args.sqlite, albums)
+    write_albums(args.sqlite, albums, args.debug)
