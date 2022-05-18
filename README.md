@@ -9,12 +9,8 @@ It will scan CUE files first, and parse CUE file structure to retrive following 
 - REM DATE 
 - PERFORMER
 - TITLE
-- FILE
-
-For each track, get following information:
-- TITLE
-- PERFORMAER (if any)
 
 ### Embedded Tags in music files
 If there is no CUE file in a folder, it will read music file directly and get ALBUM, PERFORMER and TITLE data directly.
+It can read ape, mp3, flac, and wav files.
 
