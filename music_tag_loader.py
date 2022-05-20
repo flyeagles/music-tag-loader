@@ -9,14 +9,13 @@ from mutagen.apev2 import APEv2File
 from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
 import mutagen
-from mutagen.wavpack import WavPack
 
 logger = logging.getLogger('tag_loader')
 
+
 def get_wav_meta(filename):
     audio = WAVE(filename)
-    print(audio.pprint())
-    print(audio.tags)
+    # logger.debug(audio.tags)
     return get_mp3_metadata(audio)
 
 def get_flac_meta(filename):
@@ -102,6 +101,24 @@ def parse_cue(filename):
 
     return (album, performer, year)
 
+
+music_func_map = {"flac": get_flac_meta,
+    'ape': get_ape_meta,
+    'mp3': get_mp3_meta,
+    'wav': get_wav_meta,
+    'cue': parse_cue
+}
+
+
+def handle_music_file(filename, root, music, albums):
+    if filename.endswith(music) or filename.endswith(music.upper()):
+        fullpath = os.path.join(root, filename)
+        logger.debug(f'{music}: {fullpath}')
+        albums.append((music_func_map[music])(filename))
+        return False
+
+    return True
+
 def get_albums(baseroot):
     print(baseroot)
 
@@ -113,42 +130,27 @@ def get_albums(baseroot):
         os.chdir(root)
         no_cue = True
         for filename in files:
-            fullpath = os.path.join(root, filename)
-            if filename.endswith("cue") or filename.endswith("CUE"):
-                logger.debug(fullpath)
-                albums.append(parse_cue(filename))
-                no_cue = False
+            no_cue = handle_music_file(filename, root, 'cue', albums)
+            if not no_cue:
                 break
 
         if no_cue:
             for filename in files:
-                fullpath = os.path.join(root, filename)
-                if filename.endswith('flac') or filename.endswith('FLAC'):
-                    logger.debug('flac: ' + fullpath)
-                    albums.append(get_flac_meta(filename))
-                    no_cue = False
-                    break
-
-                if filename.endswith('ape') or filename.endswith('APE'):
-                    logger.debug('ape: '+fullpath)
-                    albums.append(get_ape_meta(filename))
-                    no_cue = False
-                    break
-
-                if filename.endswith('mp3') or filename.endswith('MP3'):
-                    logger.debug('mp3: '+fullpath)
-                    albums.append(get_mp3_meta(filename))
-                    no_cue = False
-                    break
-
-                if filename.endswith('wav') or filename.endswith('WAV'):
-                    logger.debug('wav: '+fullpath)
-                    albums.append(get_wav_meta(filename))
-                    no_cue = False
+                try:
+                    for music in ['flac', 'ape', 'mp3', 'wav']:
+                        no_cue = handle_music_file(filename, root, music, albums)
+                        if not no_cue:
+                            break
+                except KeyError as e:
+                    logger.error(e)
+                    logger.error(f'{root}//{filename}')
+                    exit(1)
+    
+                if not no_cue:
                     break
 
         if no_cue and len(files) > 1:
-            logger.error(f"No cue in {root}.")
+            logger.error(f"No music file found in {root}.")
             logger.error(files)
     return albums
 
