@@ -187,7 +187,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-d", "--dir", type=str, default = '.',
-                        help="folder to scan recursively")
+                        help="folder to scan recursively, separted with ;")
     parser.add_argument("-s", "--sqlite", type=str, required=True,
                         help="path to sqlite3 db file")
     parser.add_argument("--debug", default=False, action='store_true',
@@ -199,7 +199,12 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.ERROR)
 
-    albums = get_albums(args.dir)
+    dirs = args.dir.split(';')
+    albums = []
+    for dir in dirs:
+        if dir == '':
+            continue
+        albums += get_albums(dir)
     
     print(f'Found {len(albums)} albums.')
 
