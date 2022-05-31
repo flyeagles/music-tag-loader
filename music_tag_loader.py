@@ -1,5 +1,4 @@
 import argparse
-from email.mime import base
 import os
 import re
 import logging
@@ -26,13 +25,13 @@ def get_mp3_meta(filename):
     audio = MP3(filename)
     return get_mp3_metadata(audio)
 
-def get_mp3_metadata(audio):    
+def get_mp3_metadata(audio):
     album = audio["TALB"][0]
     if 'TPE1' in audio.tags:
         performer = audio['TPE1'][0]
     else:
         performer = audio['TPE2'][0]
-    
+
     if "TDRC" in audio.tags:
         year = str(audio["TDRC"][0])
     else:
@@ -45,7 +44,7 @@ def get_ape_meta(filename):
     audio = APEv2File(filename)
     return get_metadata(audio)
 
-def get_metadata(audio):    
+def get_metadata(audio):
     album = audio["ALBUM"][0]
     if 'ALBUMARTIST' in audio.tags:
         performer = audio['ALBUMARTIST'][0]
@@ -145,7 +144,7 @@ def get_albums(baseroot):
                     logger.error(e)
                     logger.error(f'{root}//{filename}')
                     exit(1)
-    
+
                 if not no_cue:
                     break
 
@@ -180,7 +179,7 @@ def write_albums(sqlitefile, albums, debug):
         else:
             cursor.executemany("INSERT INTO albums VALUES (?,?,?) ON CONFLICT DO NOTHING", albums)
 
-        CONN.commit()            
+        CONN.commit()
         cursor.close()
 
 if __name__ == "__main__":
@@ -205,7 +204,7 @@ if __name__ == "__main__":
         if dir == '':
             continue
         albums += get_albums(dir)
-    
+
     print(f'Found {len(albums)} albums.')
 
     write_albums(args.sqlite, albums, args.debug)
