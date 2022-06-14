@@ -67,6 +67,7 @@ def parse_cue(filename):
     performer = ""
     year = ""
     encodings = ['utf8', 'gbk', 'big5']
+    err_str_list = []
     for encoding in encodings:
         with open(filename, 'r', encoding=encoding) as IN:
             try:
@@ -92,10 +93,13 @@ def parse_cue(filename):
                 # need change to GBK encoding.
                 # fallback to second encoding value.
                 logger.debug(e)
+                err_str_list.append(str(e))
+
 
     if len(album) == 0:
         logger.error(os.path.join(os.getcwd(), filename))
         logger.error((album, performer, year))
+        logger.error("\n".join(err_str_list))
         exit(1)
 
     return (album, performer, year)
