@@ -198,7 +198,7 @@ def parse_cue(filename):
                 logger.debug(e)
                 err_str_list.append(str(e))
 
-    print(song_list)
+    logger.info(song_list)
     if len(album) == 0:
         logger.error(os.path.join(os.getcwd(), filename))
         logger.error((album, performer, year))
@@ -243,7 +243,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
         album, album_performer, year = "", "", ""
         song_list = []
         for filename in files:
-            print(filename)
+            logger.info(filename)
             surfix = get_file_surfix(filename)
             if surfix == 'cue':
                 result_tuple = handle_music_file(
@@ -293,13 +293,21 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
 
                 # song list is [(song_index, song_title, song_performer), ... )]
                 # need add the album's seq number to the end of tuples.
+                track_ids = []
                 for idx, song in enumerate(song_list):
+                    if song[-1] in track_ids:
+                        print(f"-----------------> {song[-1]} in {max_seq} is duplicated!")
+                    track_ids.append(song[-1])
                     song_list[idx] = song + (max_seq,)
                 new_song_list.extend(song_list)
 
             elif recrawl_songs:
                 song_seq = existing_album['seq']
+                track_ids = []
                 for idx, song in enumerate(song_list):
+                    if song[-1] in track_ids:
+                        print(f"-----------------> {song[-1]} in {song_seq} is duplicated!")
+                    track_ids.append(song[-1])
                     song_list[idx] = song + (song_seq,)
                 new_song_list.extend(song_list)
             else:
