@@ -10,6 +10,7 @@ from mutagen.flac import FLAC
 from mutagen.apev2 import APEv2File
 from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
+from mutagen.wavpack import WavPack
 # import mutagen
 
 logger = logging.getLogger('tag_loader')
@@ -18,21 +19,36 @@ logger = logging.getLogger('tag_loader')
 def get_wav_meta(filename):
     audio = WAVE(filename)
     logger.debug(audio.tags)
+    if audio.tags is None:  # corrupted file. Skip.
+        return None
     return get_mp3_metadata(audio)
 
 
 def get_mp3_meta(filename):
     audio = MP3(filename)
     logger.debug(audio.tags)
+    if audio.tags is None:  # corrupted file. Skip.
+        return None
     return get_mp3_metadata(audio)
 
 
 def get_mp3_metadata(audio):
-    album = audio["TALB"][0]
+    if "TALB" in audio.tags:
+        album = audio["TALB"][0]
+    else:
+        album = ""
 
     # 'TRCK': TRCK(encoding=<Encoding.LATIN1: 0>, text=['16/16']
-    song_index = audio['TRCK'][0].split('/')[0]
-    song_title = audio['TIT2'][0]
+    if 'TRCK' in audio.tags:
+        song_index = audio['TRCK'][0].split('/')[0]
+    else:
+        song_index = "0"
+
+    if 'TIT2' in audio.tags:
+        song_title = audio['TIT2'][0]
+    else:
+        song_title = ""
+
     if 'TPE1' in audio.tags:
         song_performer = audio['TPE1'][0]
     else:
@@ -211,7 +227,7 @@ def get_file_surfix(filename):
     return filename.split('.')[-1].lower()
 
 
-def get_albums(baseroot, max_seq, albums):
+def get_albums(baseroot, max_seq, albums, recrawl_songs):
     print(baseroot)
 
     new_album_list = []
@@ -242,6 +258,9 @@ def get_albums(baseroot, max_seq, albums):
                     if surfix in ['flac', 'ape', 'mp3', 'wav']:
                         result_tuple = handle_music_file(
                             filename, root, surfix, max_seq, albums)
+                        if result_tuple is None:
+                            continue
+
                         (album, album_performer, year,
                          song_title, song_performer, song_index) = result_tuple
                         song_list.append(
@@ -269,7 +288,8 @@ def get_albums(baseroot, max_seq, albums):
                 # dataframe row is [title, performer, release_date, seq]
                 # add new row to dataframe albums
                 # dataframe has no append() method.
-                new_album_list.append([album, album_performer, year, max_seq])
+                new_album_list.append(
+                    [album, album_performer, year, max_seq])
 
                 # song list is [(song_index, song_title, song_performer), ... )]
                 # need add the album's seq number to the end of tuples.
@@ -277,12 +297,17 @@ def get_albums(baseroot, max_seq, albums):
                     song_list[idx] = song + (max_seq,)
                 new_song_list.extend(song_list)
 
+            elif recrawl_songs:
+                song_seq = existing_album['seq']
+                for idx, song in enumerate(song_list):
+                    song_list[idx] = song + (song_seq,)
+                new_song_list.extend(song_list)
             else:
                 # the album is already in the albums dataframe, skip the song handling
                 pass
 
-    pprint.pprint(new_album_list)
-    pprint.pprint(new_song_list)
+    pprint.pprint(sorted(new_album_list))
+    pprint.pprint(sorted(new_song_list, key=lambda x: (x[3], x[2])))
 
     # add new album to albums dataframe
     new_albums = pd.DataFrame(new_album_list, columns=[
@@ -293,7 +318,7 @@ def get_albums(baseroot, max_seq, albums):
 
     print(new_albums)
     print(new_songs)
-    return new_albums, new_songs
+    return new_albums, new_songs, max_seq
 
 
 def write_albums(sqlitefile, albums, debug):
@@ -340,6 +365,8 @@ if __name__ == "__main__":
                         help="folder to scan recursively, separted with ;")
     parser.add_argument("-s", "--sqlite", type=str, required=True,
                         help="path to sqlite3 db file")
+    parser.add_argument("--song", default=False, action='store_true',
+                        help="whether to recrawl songs for existing albums")
     parser.add_argument("--debug", default=False, action='store_true',
                         help="whether to enable debug")
     args = parser.parse_args()
@@ -358,10 +385,13 @@ if __name__ == "__main__":
     print(f'max seq: {max_seq}')
 
     dirs = args.dir.split(';')
+    new_album_count = 0
+    new_song_count = 0
     for dir in dirs:
         if dir == '':
             continue
-        albums, new_songs = get_albums(dir, max_seq, albums)
+        albums, new_songs, max_seq = get_albums(
+            dir, max_seq, albums, args.song)
         # write albums dataframe and new_songs dataframe back to sqlite3 database
         print(albums)
         albums.to_sql('albums', sqlite3.connect(
@@ -369,7 +399,11 @@ if __name__ == "__main__":
         new_songs.to_sql('songs', sqlite3.connect(
             args.sqlite), if_exists='append', index=False)
 
-    print(f'Found {len(albums)} albums.')
+        new_album_count += len(albums)
+        new_song_count += len(new_songs)
+
+    print(
+        f'Found {new_album_count} albums and {new_song_count} songs.')
 
     exit(0)
 
