@@ -315,7 +315,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                 pass
 
     pprint.pprint(sorted(new_album_list))
-    pprint.pprint(sorted(new_song_list, key=lambda x: (x[3], x[2])))
+    # pprint.pprint(sorted(new_song_list, key=lambda x: (x[3], x[2])))
 
     # add new album to albums dataframe
     new_albums = pd.DataFrame(new_album_list, columns=[
