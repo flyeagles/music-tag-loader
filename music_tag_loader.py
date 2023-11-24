@@ -11,6 +11,8 @@ from mutagen.apev2 import APEv2File
 from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
 from mutagen.wavpack import WavPack
+from mutagen.dsdiff import DSDIFF
+from mutagen.dsf import DSF
 # import mutagen
 
 logger = logging.getLogger('tag_loader')
@@ -21,7 +23,7 @@ def get_wav_meta(filename):
     logger.debug(audio.tags)
     if audio.tags is None:  # corrupted file. Skip.
         return None
-    return get_mp3_metadata(audio)
+    return get_mp3_id3_metadata(audio)
 
 
 def get_mp3_meta(filename):
@@ -29,10 +31,23 @@ def get_mp3_meta(filename):
     logger.debug(audio.tags)
     if audio.tags is None:  # corrupted file. Skip.
         return None
-    return get_mp3_metadata(audio)
+    return get_mp3_id3_metadata(audio)
 
+def get_dff_meta(filename):
+    audio = DSDIFF(filename)
+    logger.debug(audio.tags)
+    if audio.tags is None:  # corrupted file. Skip.
+        return None
+    return get_mp3_id3_metadata(audio)
 
-def get_mp3_metadata(audio):
+def get_dsf_meta(filename):
+    audio = DSF(filename)
+    logger.debug(audio.tags)
+    if audio.tags is None:  # corrupted file. Skip.
+        return None
+    return get_mp3_id3_metadata(audio)
+
+def get_mp3_id3_metadata(audio):
     if "TALB" in audio.tags:
         album = audio["TALB"][0]
     else:
@@ -140,6 +155,7 @@ def parse_cue(filename):
                 INDEX 00 04:21:00
                 INDEX 01 04:22:32
             '''
+            line = "dummy line"
             try:
                 song_idx = -1
                 song_performer = None
@@ -196,6 +212,7 @@ def parse_cue(filename):
                 # need change to GBK encoding.
                 # fallback to second encoding value.
                 logger.debug(e)
+                logger.debug(line)
                 err_str_list.append(str(e))
 
     logger.info(song_list)
@@ -212,6 +229,8 @@ music_func_map = {"flac": get_flac_meta,
                   'ape': get_ape_meta,
                   'mp3': get_mp3_meta,
                   'wav': get_wav_meta,
+                  'dff': get_dff_meta,
+                  'dsf': get_dsf_meta,
                   'cue': parse_cue
                   }
 
@@ -255,7 +274,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
             for filename in files:
                 try:
                     surfix = get_file_surfix(filename)
-                    if surfix in ['flac', 'ape', 'mp3', 'wav']:
+                    if surfix in ['flac', 'ape', 'mp3', 'wav', 'dff', 'dsf']:
                         result_tuple = handle_music_file(
                             filename, root, surfix, max_seq, albums)
                         if result_tuple is None:

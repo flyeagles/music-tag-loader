@@ -8,6 +8,8 @@ from mutagen.flac import FLAC
 from mutagen.apev2 import APEv2File
 from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
+from mutagen.dsdiff import DSDIFF
+from mutagen.dsf import DSF
 from mutagen.id3 import ID3, TIT2, TALB, TRCK, TPE1, TDRC
 from mutagen.easyid3 import EasyID3
 
@@ -35,7 +37,16 @@ def set_mp3_meta(filename, album, year, total, title_info):
     logger.debug(audio.tags)
     set_mp3_metadata(audio, album, year, total, title_info)
 
+def set_dff_meta(filename, album, year, total, title_info, track_num):
+    audio = DSDIFF(filename)
+    logger.debug(audio.tags)
+    set_mp3_metadata(audio, album, year, total, title_info, track_num)
 
+def set_dsf_meta(filename, album, year, total, title_info, track_num):
+    audio = DSF(filename)
+    logger.debug(audio.tags)
+    set_mp3_metadata(audio, album, year, total, title_info, track_num)
+    
 def set_mp3_metadata(audio, album, year, total, title_info, track_num):
     '''
     {'TIT2': TIT2(encoding=<Encoding.UTF16: 1>, text=['2']),  # track title
@@ -126,6 +137,8 @@ music_func_map = {"flac": set_flac_meta,
                   'ape': set_ape_meta,
                   'mp3': set_mp3_meta,
                   'wav': set_wav_meta,
+                  'dff': set_dff_meta,
+                  'dsf': set_dsf_meta,
                   'cue': parse_cue
                   }
 
@@ -139,7 +152,8 @@ def handle_music_file(filename, album, year, total, title_info, track_num):
 
 def is_music_file(filename):
     norm_filename = filename.lower()
-    return norm_filename.endswith('flac') or norm_filename.endswith('ape') or norm_filename.endswith('mp3') or norm_filename.endswith('wav')
+    return norm_filename.endswith('flac') or norm_filename.endswith('ape') or norm_filename.endswith('mp3') or \
+        norm_filename.endswith('wav') or norm_filename.endswith('dff') or norm_filename.endswith('dsf')
 
 
 def set_tags(baseroot, album, year, total, song_title_list):
