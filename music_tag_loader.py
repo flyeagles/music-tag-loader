@@ -319,21 +319,31 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                     track_ids.append(song[-1])
                     song_list[idx] = song + (max_seq,)
                 new_song_list.extend(song_list)
-
-            elif recrawl_songs:
-                song_seq = existing_album['seq']
-                track_ids = []
-                for idx, song in enumerate(song_list):
-                    if song[-1] in track_ids:
-                        print(f"-----------------> {song[-1]} in {song_seq} is duplicated!")
-                    track_ids.append(song[-1])
-                    song_list[idx] = song + (song_seq,)
-                new_song_list.extend(song_list)
             else:
-                # the album is already in the albums dataframe, skip the song handling
-                pass
+                # print duplicate album info
+                print("======================================")
+                pprint.pprint(existing_album)
+                print("======================================")
+                if recrawl_songs:
+                    song_seq = existing_album['seq']
+                    track_ids = []
+                    for idx, song in enumerate(song_list):
+                        if song[-1] in track_ids:
+                            print(f"-----------------> {song[-1]} in {song_seq} is duplicated!")
+                        track_ids.append(song[-1])
+                        song_list[idx] = song + (song_seq,)
+                    new_song_list.extend(song_list)
+                else:
+                    # the album is already in the albums dataframe, skip the song handling
+                    pass
 
-    pprint.pprint(sorted(new_album_list))
+    sorted_album_list = sorted(new_album_list)
+    pprint.pprint(sorted_album_list)
+    l_total = len(sorted_album_list)
+    for idx in range(l_total - 1):
+        # [album, album_performer, year, max_seq])
+        if sorted_album_list[idx][0] == sorted_album_list[idx+1][0]:
+            print(f"============== Duplicated album {sorted_album_list[idx][0]} {sorted_album_list[idx][1]}")
     # pprint.pprint(sorted(new_song_list, key=lambda x: (x[3], x[2])))
 
     # add new album to albums dataframe
