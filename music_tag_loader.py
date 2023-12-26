@@ -13,9 +13,53 @@ from mutagen.wave import WAVE
 from mutagen.wavpack import WavPack
 from mutagen.dsdiff import DSDIFF
 from mutagen.dsf import DSF
+from mutagen.mp4 import MP4
 # import mutagen
 
 logger = logging.getLogger('tag_loader')
+
+
+def get_mp4_meta(filename):
+    audio = MP4(filename)
+    logger.debug(audio.tags)
+    if audio.tags is None:  # corrupted file. Skip.
+        return None
+    return get_mp4_metadata(audio)
+
+
+def get_mp4_metadata(audio):
+    if "\xa9alb" in audio.tags:
+        album = audio["\xa9alb"][0]
+    else:
+        album = ""
+
+    # 'trkn': [(1, 12)]
+    if 'trkn' in audio.tags:
+        song_index = audio['trkn'][0][0]
+    else:
+        song_index = "0"
+
+    if "\xa9nam" in audio.tags:
+        song_title = audio["\xa9nam"][0]
+    else:
+        song_title = ""
+
+    if '\xa9ART' in audio.tags:
+        song_performer = audio['\xa9ART'][0]
+    else:
+        song_performer = ""
+
+    if 'aART' in audio.tags:
+        album_performer = audio['aART'][0]
+    else:
+        album_performer = song_performer
+
+    if "\xa9day" in audio.tags:
+        year = str(audio["\xa9day"][0])
+    else:
+        year = ""
+
+    return (album.strip(), album_performer.strip(), year, song_title.strip(), song_performer.strip(), song_index)
 
 
 def get_wav_meta(filename):
@@ -33,6 +77,7 @@ def get_mp3_meta(filename):
         return None
     return get_mp3_id3_metadata(audio)
 
+
 def get_dff_meta(filename):
     audio = DSDIFF(filename)
     logger.debug(audio.tags)
@@ -40,12 +85,14 @@ def get_dff_meta(filename):
         return None
     return get_mp3_id3_metadata(audio)
 
+
 def get_dsf_meta(filename):
     audio = DSF(filename)
     logger.debug(audio.tags)
     if audio.tags is None:  # corrupted file. Skip.
         return None
     return get_mp3_id3_metadata(audio)
+
 
 def get_mp3_id3_metadata(audio):
     if "TALB" in audio.tags:
@@ -155,12 +202,25 @@ def parse_cue(filename):
                 INDEX 00 04:21:00
                 INDEX 01 04:22:32
             '''
+            '''
+            Another cue format
+            FILE "01 - Call My Name.flac" WAVE
+                TITLE "Call My Name"
+                TRACK 01 AUDIO
+                INDEX 01 00:00:00
+            FILE "02 - Crazy Chick.flac" WAVE
+                TITLE "Crazy Chick"
+                TRACK 02 AUDIO
+                INDEX 01 00:00:00 
+            '''
+
             line = "dummy line"
             try:
                 song_idx = -1
                 song_performer = None
                 indexed = False
                 for line in IN.readlines():
+                    logger.debug(line)
                     match = re.match("^REM DATE\s+(.*)", line,
                                      flags=re.IGNORECASE)
                     if match:
@@ -215,8 +275,9 @@ def parse_cue(filename):
                 logger.debug(line)
                 err_str_list.append(str(e))
 
-    logger.info(song_list)
+    logger.debug(song_list)
     if len(album) == 0:
+        logger.error("Cannot find album name!")
         logger.error(os.path.join(os.getcwd(), filename))
         logger.error((album, performer, year))
         logger.error("\n".join(err_str_list))
@@ -231,6 +292,7 @@ music_func_map = {"flac": get_flac_meta,
                   'wav': get_wav_meta,
                   'dff': get_dff_meta,
                   'dsf': get_dsf_meta,
+                  'mp4': get_mp4_meta,
                   'cue': parse_cue
                   }
 
@@ -274,7 +336,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
             for filename in files:
                 try:
                     surfix = get_file_surfix(filename)
-                    if surfix in ['flac', 'ape', 'mp3', 'wav', 'dff', 'dsf']:
+                    if surfix in ['flac', 'ape', 'mp3', 'wav', 'dff', 'dsf', 'mp4']:
                         result_tuple = handle_music_file(
                             filename, root, surfix, max_seq, albums)
                         if result_tuple is None:
@@ -308,14 +370,15 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                 # add new row to dataframe albums
                 # dataframe has no append() method.
                 new_album_list.append(
-                    [album, album_performer, year, max_seq])
+                    [album, album_performer, year, max_seq, album_performer])
 
                 # song list is [(song_index, song_title, song_performer), ... )]
                 # need add the album's seq number to the end of tuples.
                 track_ids = []
                 for idx, song in enumerate(song_list):
                     if song[-1] in track_ids:
-                        print(f"-----------------> {song[-1]} in {max_seq} is duplicated!")
+                        print(
+                            f"-----------------> {song[-1]} in {max_seq} is duplicated!")
                     track_ids.append(song[-1])
                     song_list[idx] = song + (max_seq,)
                 new_song_list.extend(song_list)
@@ -329,7 +392,8 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                     track_ids = []
                     for idx, song in enumerate(song_list):
                         if song[-1] in track_ids:
-                            print(f"-----------------> {song[-1]} in {song_seq} is duplicated!")
+                            print(
+                                f"-----------------> {song[-1]} in {song_seq} is duplicated!")
                         track_ids.append(song[-1])
                         song_list[idx] = song + (song_seq,)
                     new_song_list.extend(song_list)
@@ -343,12 +407,13 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
     for idx in range(l_total - 1):
         # [album, album_performer, year, max_seq])
         if sorted_album_list[idx][0] == sorted_album_list[idx+1][0]:
-            print(f"============== Duplicated album {sorted_album_list[idx][0]} {sorted_album_list[idx][1]}")
+            print(
+                f"============== Duplicated album {sorted_album_list[idx][0]} {sorted_album_list[idx][1]}")
     # pprint.pprint(sorted(new_song_list, key=lambda x: (x[3], x[2])))
 
     # add new album to albums dataframe
     new_albums = pd.DataFrame(new_album_list, columns=[
-                              'title', 'performer', 'release_date', 'seq'])
+                              'title', 'performer', 'release_date', 'seq', 'performer_zh'])
     # add new songs to songs dataframe
     new_songs = pd.DataFrame(new_song_list, columns=[
         'title', 'performer', 'seq', 'albumid'])
@@ -358,6 +423,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
     return new_albums, new_songs, max_seq
 
 
+'''
 def write_albums(sqlitefile, albums, debug):
     print(sqlitefile)
     with sqlite3.connect(sqlitefile) as CONN:
@@ -371,7 +437,7 @@ def write_albums(sqlitefile, albums, debug):
             for item in albums:
                 try:
                     cursor.executemany(
-                        "INSERT INTO albums VALUES (?,?,?) ON CONFLICT DO NOTHING", [item])
+                        "INSERT INTO albums(title, performer, release_date, performer_zh) VALUES (?,?,?,?) ON CONFLICT DO NOTHING", [item])
                 except sqlite3.InterfaceError as e:
                     logger.error(f"Type par0: {type(item[0])}")
                     logger.error(f"Type par1: {type(item[1])}")
@@ -381,10 +447,11 @@ def write_albums(sqlitefile, albums, debug):
                     exit(1)
         else:
             cursor.executemany(
-                "INSERT INTO albums VALUES (?,?,?) ON CONFLICT DO NOTHING", albums)
+                "INSERT INTO albums(title, performer, release_date, performer_zh) VALUES (?, ?,?,?) ON CONFLICT DO NOTHING", albums)
 
         CONN.commit()
         cursor.close()
+'''
 
 
 def load_albums_to_dataframe(sqlitefile):

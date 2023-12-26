@@ -10,6 +10,7 @@ from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
 from mutagen.dsdiff import DSDIFF
 from mutagen.dsf import DSF
+from mutagen.mp4 import MP4, MP4Tags
 from mutagen.id3 import ID3, TIT2, TALB, TRCK, TPE1, TDRC, TPE2
 from mutagen.easyid3 import EasyID3
 
@@ -36,6 +37,12 @@ def set_mp3_meta(filename, album, year, total, band, title_info):
     audio = MP3(filename)
     logger.debug(audio.tags)
     set_mp3_metadata(audio, album, year, total, band, title_info)
+
+
+def set_mp4_meta(filename, album, year, total, band, title_info):
+    audio = MP4(filename)
+    logger.debug(audio.tags)
+    set_mp4_metadata(audio, album, year, total, band, title_info)
 
 
 def set_dff_meta(filename, album, year, total, band, title_info, track_num):
@@ -65,6 +72,27 @@ def set_mp3_metadata(audio, album, year, total, band, title_info, track_num):
     audio['TRCK'] = TRCK(encoding=3, text=[f'{track_num}/{total}'])
     audio['TALB'] = TALB(encoding=3, text=[album])
     audio['TDRC'] = TDRC(encoding=3, text=[year])
+
+    audio.save()
+
+
+def set_mp4_metadata(audio, album, year, total, band, title_info, track_num):
+    # audio should be a MP4 file object
+    '''
+        album = audio["\xa9alb"][0]
+    # 'trkn': [(1, 12)]
+        song_index = audio['trkn'][0][0]
+        song_title = audio["\xa9nam"][0]
+        song_performer = audio['\xa9ART'][0]
+        album_performer = audio['aART'][0]
+        year = str(audio["\xa9day"][0])
+    '''
+    audio["\xa9nam"] = [title_info[0]]      # track title
+    audio['\xa9ART'] = [title_info[1]]  # artist
+    audio['aART'] = [band]   # band
+    audio['trkn'] = [f'({track_num}, {total})']  # track number
+    audio['\xa9alb'] = [album]   # album title
+    audio['\xa9day'] = [year]    # date
 
     audio.save()
 
@@ -142,6 +170,7 @@ def parse_cue(filename):
 music_func_map = {"flac": set_flac_meta,
                   'ape': set_ape_meta,
                   'mp3': set_mp3_meta,
+                  'mp4': set_mp4_meta,
                   'wav': set_wav_meta,
                   'dff': set_dff_meta,
                   'dsf': set_dsf_meta,
@@ -160,7 +189,7 @@ def is_music_file(filename):
     norm_filename = filename.lower()
     return norm_filename.endswith('flac') or norm_filename.endswith('ape') or norm_filename.endswith('mp3') or \
         norm_filename.endswith('wav') or norm_filename.endswith(
-            'dff') or norm_filename.endswith('dsf')
+            'dff') or norm_filename.endswith('dsf') or norm_filename.endswith('mp4')
 
 
 def set_tags(baseroot, album, year, total, band, song_title_list):
