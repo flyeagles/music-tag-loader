@@ -220,7 +220,7 @@ def parse_cue(filename):
                 song_performer = None
                 indexed = False
                 for line in IN.readlines():
-                    logger.debug(line)
+                    logger.debug(line.strip())
                     match = re.match("^REM DATE\s+(.*)", line,
                                      flags=re.IGNORECASE)
                     if match:
@@ -271,8 +271,8 @@ def parse_cue(filename):
             except UnicodeDecodeError as e:
                 # need change to GBK encoding.
                 # fallback to second encoding value.
-                logger.debug(e)
-                logger.debug(line)
+                logger.error(e)
+                logger.error(line)
                 err_str_list.append(str(e))
 
     logger.debug(song_list)
@@ -319,18 +319,25 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
         # print(files) files within root
         os.chdir(root)
         print(root)
+        # root is the path to the album
         no_cue = True
         result_tuple = None
         album, album_performer, year = "", "", ""
         song_list = []
+        cue_count = 0
         for filename in files:
             logger.info(filename)
             surfix = get_file_surfix(filename)
             if surfix == 'cue':
                 result_tuple = handle_music_file(
                     filename, root, 'cue', max_seq, albums)
-            if result_tuple is not None:
-                break
+                if result_tuple is not None:
+                    # here I want to continue the check to see if there is another CUE file in the same folder.
+                    cue_count += 1
+
+        if cue_count > 1:
+            logger.error(
+                f"More than one cue file found in {root}. =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=!!!!!!")
 
         if result_tuple is None:
             for filename in files:
@@ -370,14 +377,14 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                 # add new row to dataframe albums
                 # dataframe has no append() method.
                 new_album_list.append(
-                    [album, album_performer, year, max_seq, album_performer])
+                    [album, album_performer, year, max_seq, album_performer, root])
 
                 # song list is [(song_index, song_title, song_performer), ... )]
                 # need add the album's seq number to the end of tuples.
                 track_ids = []
                 for idx, song in enumerate(song_list):
                     if song[-1] in track_ids:
-                        print(
+                        logger.error(
                             f"-----------------> {song[-1]} in {max_seq} is duplicated!")
                     track_ids.append(song[-1])
                     song_list[idx] = song + (max_seq,)
@@ -392,7 +399,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                     track_ids = []
                     for idx, song in enumerate(song_list):
                         if song[-1] in track_ids:
-                            print(
+                            logger.error(
                                 f"-----------------> {song[-1]} in {song_seq} is duplicated!")
                         track_ids.append(song[-1])
                         song_list[idx] = song + (song_seq,)
@@ -402,18 +409,18 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                     pass
 
     sorted_album_list = sorted(new_album_list)
-    pprint.pprint(sorted_album_list)
+    logger.info(pprint.pformat(sorted_album_list))
     l_total = len(sorted_album_list)
     for idx in range(l_total - 1):
         # [album, album_performer, year, max_seq])
-        if sorted_album_list[idx][0] == sorted_album_list[idx+1][0]:
-            print(
-                f"============== Duplicated album {sorted_album_list[idx][0]} {sorted_album_list[idx][1]}")
+        if sorted_album_list[idx][0] == sorted_album_list[idx+1][0] and sorted_album_list[idx][1] == sorted_album_list[idx+1][1]:
+            logger.error(
+                f"============== Duplicated album {sorted_album_list[idx][0]} {sorted_album_list[idx][1]} {sorted_album_list[idx+1][-1]} {sorted_album_list[idx][-1]}")
     # pprint.pprint(sorted(new_song_list, key=lambda x: (x[3], x[2])))
 
     # add new album to albums dataframe
     new_albums = pd.DataFrame(new_album_list, columns=[
-                              'title', 'performer', 'release_date', 'seq', 'performer_zh'])
+                              'title', 'performer', 'release_date', 'seq', 'performer_zh', 'path'])
     # add new songs to songs dataframe
     new_songs = pd.DataFrame(new_song_list, columns=[
         'title', 'performer', 'seq', 'albumid'])
@@ -462,6 +469,26 @@ def load_albums_to_dataframe(sqlitefile):
         return albums
 
 
+def set_logger(args, logfile):
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    elif args.info:
+        logging.basicConfig(level=logging.INFO)
+    else:
+        logging.basicConfig(level=logging.ERROR)
+
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    if logfile is not None:
+        file_handler = logging.FileHandler(logfile)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -473,12 +500,17 @@ if __name__ == "__main__":
                         help="whether to recrawl songs for existing albums")
     parser.add_argument("--debug", default=False, action='store_true',
                         help="whether to enable debug")
+    parser.add_argument("--info", default=False, action='store_true',
+                        help="whether to enable info logging. info is a higher level than debug.")
+    parser.add_argument("--logfile", default=False, action='store_true',
+                        help="whether to write log to a file.")
     args = parser.parse_args()
 
-    if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
+    if args.logfile:
+        base_dir = os.path.dirname(os.path.realpath(__file__))
+        set_logger(args, os.path.join(base_dir, 'tag_loader.log'))
     else:
-        logging.basicConfig(level=logging.ERROR)
+        set_logger(args, None)
 
     albums = load_albums_to_dataframe(args.sqlite)
     # get the max value of seq in albums

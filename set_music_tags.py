@@ -27,10 +27,10 @@ def set_wav_meta(filename, album, year, total, band, title_info, track_num):
     set_mp3_metadata(audio, album, year, total, band, title_info, track_num)
 
 
-def set_flac_meta(filename, album, year, total, band, title_info):
+def set_flac_meta(filename, album, year, total, band, title_info, track_num):
     audio = FLAC(filename)
     logger.debug(audio.tags)
-    set_metadata(audio, album, year, total, band, title_info)
+    set_metadata(audio, album, year, total, band, title_info, track_num)
 
 
 def set_mp3_meta(filename, album, year, total, band, title_info):
@@ -103,23 +103,18 @@ def set_ape_meta(filename, title_info):
     set_metadata(audio, title_info)
 
 
-def set_metadata(audio):
-    album = audio["ALBUM"][0]
-    if 'ALBUMARTIST' in audio.tags:
-        performer = audio['ALBUMARTIST'][0]
-    elif 'ARTIST' in audio.tags:
-        performer = audio['ARTIST'][0]
-    else:
-        performer = audio['ALBUM ARTIST'][0]
+def set_metadata(audio, album, year, total, band, title_info, track_num):
+    audio["ALBUM"] = [album]
+    audio['ALBUMARTIST'] = [band]
+    audio['ARTIST'] = [title_info[1]]
+    # performer = audio['ALBUM ARTIST'][0]
 
-    if "DATE" in audio.tags:
-        year = audio["DATE"][0]
-    elif 'YEAR' in audio.tags:
-        year = audio["YEAR"][0]
-    else:
-        year = ""
+    audio["DATE"] = [year]
+    audio["TITLE"] = [title_info[0]]
+    audio["TRACKNUMBER"] = [str(track_num)]
+    audio["TRACKTOTAL"] = [str(total)]
 
-    return (album, performer, year)
+    audio.save()
 
 
 def parse_cue(filename):

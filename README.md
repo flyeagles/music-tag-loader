@@ -10,16 +10,17 @@ It will scan CUE files first, and parse CUE file structure to retrive following 
 - PERFORMER
 - TITLE
 
+It will also try to detect multiple CUE files present in the same folder, which indicates wrong folder structure. 
+
 ### Embedded Tags in music files
 If there is no CUE file in a folder, it will read music file directly and get ALBUM, PERFORMER and TITLE data directly.
-It can read ape, mp3, flac, and wav files.
+It can read ape, mp3, flac, wav, dff, dsf, and mp4 files.
 
 ## Song Data
 
 I want to get individual song's information.
 - Title
 - PERFORMER (if existing in the track info)
-- Length in seconds
 
 # Music Tag Batch Insert
 
@@ -30,3 +31,8 @@ I am using mutagend module to do the tag processing. https://mutagen.readthedocs
 It supports ASF, FLAC, MP4, Monkey’s Audio, MP3, Musepack, Ogg Opus, Ogg FLAC, Ogg Speex, Ogg Theora, Ogg Vorbis, True Audio, WavPack, OptimFROG, and AIFF audio files. All versions of ID3v2 are supported, and all standard ID3v2.4 frames are parsed. Mutagen works with Python 3.8+ (CPython and PyPy) on Linux, Windows and macOS, and has no dependencies outside the Python standard library. 
 
 v1.47.0 is used for now.
+
+## Rating for albums, and songs.
+Add rating column to albums and songs table. Default to None. Only set manually.
+
+## Full path for albums.
