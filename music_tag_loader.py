@@ -318,7 +318,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
         # print(dirs) subfolders within root
         # print(files) files within root
         os.chdir(root)
-        print(root)
+        logger.debug(root)
         # root is the path to the album
         no_cue = True
         result_tuple = None
@@ -391,9 +391,8 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
                 new_song_list.extend(song_list)
             else:
                 # print duplicate album info
-                print("======================================")
-                pprint.pprint(existing_album)
-                print("======================================")
+                logger.info("======================================")
+                logger.info(pprint.pformat(existing_album))
                 if recrawl_songs:
                     song_seq = existing_album['seq']
                     track_ids = []
