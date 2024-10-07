@@ -22,7 +22,7 @@ logger = logging.getLogger('tag_loader')
 def get_mp4_meta(filename):
     audio = MP4(filename)
     logger.debug(audio.tags)
-    if audio.tags is None:  # corrupted file. Skip.
+    if audio.tags is None:  # corrupted file. Skip.        
         return None
     return get_mp4_metadata(audio)
 
@@ -221,42 +221,42 @@ def parse_cue(filename):
                 indexed = False
                 for line in IN.readlines():
                     logger.debug(line.strip())
-                    match = re.match("^REM DATE\s+(.*)", line,
+                    match = re.match(r"^REM DATE\s+(.*)", line,
                                      flags=re.IGNORECASE)
                     if match:
                         year = match.group(1)
                         continue
 
-                    match = re.match("^PERFORMER\s+(.*)",
+                    match = re.match(r"^PERFORMER\s+(.*)",
                                      line, flags=re.IGNORECASE)
                     if match:
                         performer = match.group(1).replace("\"", "")
                         continue
 
-                    match = re.match("^TITLE\s+\"(.*)\"",
+                    match = re.match(r"^TITLE\s+\"(.*)\"",
                                      line, flags=re.IGNORECASE)
                     if match:
                         album = match.group(1)
 
-                    match = re.match("^\s*TRACK\s+(\d+)\s+AUDIO",
+                    match = re.match(r"^\s*TRACK\s+(\d+)\s+AUDIO",
                                      line, flags=re.IGNORECASE)
                     if match:
                         indexed = False
                         song_idx = (int)(match.group(1))
 
-                    match = re.match("^\s+TITLE\s+\"(.*)\"",
+                    match = re.match(r"^\s+TITLE\s+\"(.*)\"",
                                      line, flags=re.IGNORECASE)
                     if song_idx >= 0 and match:
                         song_title = match.group(1)
 
-                    match = re.match("^\s+PERFORMER\s+(.*)",
+                    match = re.match(r"^\s+PERFORMER\s+(.*)",
                                      line, flags=re.IGNORECASE)
                     if song_idx >= 0 and match:
                         song_performer = match.group(1).replace("\"", "")
 
                     # a track can have two index lines. so we need skip the second index line.
                     match = re.match(
-                        "^\s+INDEX\s+\d+\s+(\d+):(\d+):(\d+)", line, flags=re.IGNORECASE)
+                        r"^\s+INDEX\s+\d+\s+(\d+):(\d+):(\d+)", line, flags=re.IGNORECASE)
                     if match and not indexed:  # we are done with current song.
                         indexed = True
                         if song_performer is None:
@@ -293,6 +293,7 @@ music_func_map = {"flac": get_flac_meta,
                   'dff': get_dff_meta,
                   'dsf': get_dsf_meta,
                   'mp4': get_mp4_meta,
+                  'm4a': get_mp4_meta,
                   'cue': parse_cue
                   }
 
@@ -343,7 +344,7 @@ def get_albums(baseroot, max_seq, albums, recrawl_songs):
             for filename in files:
                 try:
                     surfix = get_file_surfix(filename)
-                    if surfix in ['flac', 'ape', 'mp3', 'wav', 'dff', 'dsf', 'mp4']:
+                    if surfix in ['flac', 'ape', 'mp3', 'wav', 'dff', 'dsf', 'mp4', 'm4a']:
                         result_tuple = handle_music_file(
                             filename, root, surfix, max_seq, albums)
                         if result_tuple is None:
